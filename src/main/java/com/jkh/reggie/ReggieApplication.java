@@ -5,9 +5,11 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.ServletComponentScan;
-import org.springframework.context.annotation.ComponentScan;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.EnableCaching;
+
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
 
 /*lombok提供日志*/
 @Slf4j
@@ -15,6 +17,8 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 /*扫描控制器*/
 @ServletComponentScan
 @EnableTransactionManagement
+/*开启springcach注解缓存*/
+@EnableCaching
 
 public class ReggieApplication {
     public static void main(String[] args) {

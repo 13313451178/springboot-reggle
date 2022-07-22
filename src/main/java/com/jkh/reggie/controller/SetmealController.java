@@ -14,6 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.annotations.Lang;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -30,6 +33,7 @@ public class SetmealController {
     @Autowired
     private CategoryService categoryService;
     @PostMapping
+    @CacheEvict(value = "setmealCach",allEntries = true)
     public R<String> save(@RequestBody SetmealDto setmealDto){
         log.info("setmealDto"+setmealDto);
         setmealService.saveWithDish(setmealDto);
@@ -85,12 +89,15 @@ public class SetmealController {
     }
     /*删除*/
     @DeleteMapping
+    /*删除一个套餐时 清除所有套餐缓存*/
+    @CacheEvict(value = "setmealCach",allEntries = true)
     public R<String > delete(@RequestParam List<Long> ids){
         setmealService.deleteByIds(ids);
         return R.success("删除成功");
     }
 //    在移动端展示
     @GetMapping("/list")
+    @Cacheable(value = "setmealCach",key = "#categoryId+'_'+#status")
     public R<List<Setmeal>> list(Long categoryId,int status){
         log.info("categoryId="+categoryId+"status="+status);
         LambdaQueryWrapper<Setmeal> queryWrapper = new LambdaQueryWrapper<>();
