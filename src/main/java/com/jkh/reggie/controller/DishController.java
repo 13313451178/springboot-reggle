@@ -17,10 +17,14 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @Slf4j
@@ -33,6 +37,8 @@ public class DishController {
     @Autowired
     private CategoryService categoryService;
     /*新增菜品*/
+    @Autowired
+    private RedisTemplate redisTemplate;
     @PostMapping
     public R<String> save(@RequestBody DishDto dishDto){
         dishService.saveDishAndFlavor(dishDto);
@@ -85,6 +91,13 @@ public class DishController {
     @PutMapping
     public R<String> update(@RequestBody DishDto dishDto){
         dishService.updateDishAndDishFlavor(dishDto);
+        /*清理redis中的缓存*/
+        /*清楚所有菜品*/
+        /*Set keys = redisTemplate.keys("dish_*");
+        redisTemplate.delete(keys);*/
+        /*清理该分类的缓存*/
+        String key="dish_"+dishDto.getCategoryId()+"_1";
+        redisTemplate.delete(key);
         return R.success("修改菜品成功");
     }
     /*菜品的停售起售*/
@@ -155,6 +168,15 @@ public class DishController {
     /**/
     @GetMapping("/list")
     public R<List<DishDto>> list(Dish dish){
+        List<DishDto> arrayList=null;
+        /*从redis获取缓存数据 如果存在则从缓存中获取 如果没有 就查询数据库*/
+        String key="dish_"+dish.getCategoryId()+"_"+dish.getStatus();//
+        arrayList = (List<DishDto>) redisTemplate.opsForValue().get(key);
+        if(arrayList!=null){
+            return R.success(arrayList);
+        }
+        /*如果不存在 查数据库*/
+
         log.info("dish"+dish.toString());
         LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Dish::getCategoryId,dish.getCategoryId());
@@ -164,7 +186,7 @@ public class DishController {
         }
         queryWrapper.orderByAsc(Dish::getSort).orderByDesc(Dish::getUpdateTime);
         List<Dish> list = dishService.list(queryWrapper);
-        ArrayList<DishDto> arrayList = new ArrayList<>();
+        arrayList = new ArrayList<>();
         for (Dish dish1 : list) {
             DishDto dishDto = new DishDto();
             BeanUtils.copyProperties(dish1,dishDto);
@@ -175,6 +197,7 @@ public class DishController {
             arrayList.add(dishDto);
         }
         List<DishDto> dishDtolist=arrayList;
+        redisTemplate.opsForValue().set(key,dishDtolist,60, TimeUnit.MINUTES);
         return R.success(dishDtolist);
 }
 

@@ -8,6 +8,8 @@ import com.jkh.reggie.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
@@ -23,6 +26,8 @@ import java.util.Map;
 public class UserController {
     @Autowired
     private UserService userService;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
     /*获取验证码*/
     @PostMapping("/sendMsg")
     public R<String> sendMsg(@RequestBody User user, HttpSession session){
@@ -32,7 +37,10 @@ public class UserController {
             /*获取一个随机验证码*/
             String code = String.valueOf(SMSUtils.getCode());
             log.info("当前用户生成的验证码："+code);
-            session.setAttribute(phone,code);
+            /*验证码放入缓存 设置有效期1分钟*/
+            ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
+            operations.set(phone,code,1, TimeUnit.MINUTES);
+//            session.setAttribute(phone,code);
             return R.success("短信发送成功");
         }
         return R.error("短信发送失败");
@@ -43,7 +51,9 @@ public class UserController {
         String phone = map.get("phone").toString();
         String code = map.get("code").toString();
         /*获取session中的验正码*/
-        Object attribute = session.getAttribute(phone);
+        /*Object attribute = session.getAttribute(phone);*/
+        /*从redis中获取验证码*/
+        Object attribute=stringRedisTemplate.opsForValue().get(phone);
         if(attribute!=null&&attribute.equals(code)){
             /*登陆成功*/
             /*判断当前用户是否是新用户*/
@@ -58,6 +68,9 @@ public class UserController {
                 userService.save(user);
             }
             session.setAttribute("user",user.getId());
+            /*用户登录成功*/
+            /*删除redis中验证码*/
+            stringRedisTemplate.delete(phone);
             return R.success(user);
         }
         return R.error("登陆失败");
